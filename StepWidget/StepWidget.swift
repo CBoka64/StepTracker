@@ -27,6 +27,13 @@ struct StepWidget: Widget {
             provider: StepWidgetProvider()
         ) { entry in
             StepWidgetView(entry: entry)
+                .containerBackground(for: .widget) {
+                    LinearGradient(
+                        colors: entry.gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
         }
         .configurationDisplayName("Suivi de pas")
         .description("Affiche vos pas du jour avec un dégradé de couleur selon votre objectif.")
@@ -34,7 +41,5 @@ struct StepWidget: Widget {
             .systemSmall,   // Widget carré
             .systemMedium   // Widget rectangulaire
         ])
-        // Sur iOS 17+, on peut utiliser containerBackground pour le fond.
-        // Pour la compatibilité iOS 16, le fond est géré dans la vue elle-même.
     }
 }

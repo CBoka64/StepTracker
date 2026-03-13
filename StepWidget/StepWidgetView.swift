@@ -40,49 +40,37 @@ struct SmallWidgetView: View {
     let entry: StepEntry
 
     var body: some View {
-        ZStack {
-            // Fond avec dégradé dynamique basé sur la progression
-            ContainerRelativeShape()
-                .fill(
-                    LinearGradient(
-                        colors: entry.gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+        VStack(spacing: 8) {
+            // Icône de pied
+            // On utilise le SF Symbol "figure.walk" qui est natif iOS.
+            // Pas besoin d'importer d'image custom !
+            Image(systemName: "figure.walk")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(.white)
 
-            VStack(spacing: 8) {
-                // Icône de pied
-                // On utilise le SF Symbol "figure.walk" qui est natif iOS.
-                // Pas besoin d'importer d'image custom !
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.white)
+            // Nombre de pas — le chiffre principal, bien visible
+            Text("\(entry.stepCount)")
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+                .minimumScaleFactor(0.6)  // Réduit la taille si le nombre est très grand
+                .lineLimit(1)
 
-                // Nombre de pas — le chiffre principal, bien visible
-                Text("\(entry.stepCount)")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .minimumScaleFactor(0.6)  // Réduit la taille si le nombre est très grand
-                    .lineLimit(1)
+            // Label "pas" sous le nombre
+            Text("pas")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
 
-                // Label "pas" sous le nombre
-                Text("pas")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+            // Barre de progression horizontale
+            ProgressBarView(progress: entry.progress)
+                .frame(height: 6)
+                .padding(.horizontal, 8)
 
-                // Barre de progression horizontale
-                ProgressBarView(progress: entry.progress)
-                    .frame(height: 6)
-                    .padding(.horizontal, 8)
-
-                // Objectif en petit texte
-                Text("Objectif : \(entry.stepGoal)")
-                    .font(.system(size: 9, weight: .regular))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            .padding(12)
+            // Objectif en petit texte
+            Text("Objectif : \(entry.stepGoal)")
+                .font(.system(size: 9, weight: .regular))
+                .foregroundColor(.white.opacity(0.7))
         }
+        .padding(12)
     }
 }
 
@@ -94,89 +82,72 @@ struct MediumWidgetView: View {
     let entry: StepEntry
 
     var body: some View {
-        ZStack {
-            // Même dégradé que le carré
-            ContainerRelativeShape()
-                .fill(
-                    LinearGradient(
-                        colors: entry.gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+        HStack(spacing: 16) {
 
-            HStack(spacing: 16) {
+            // ---- Côté gauche : icône + nombre de pas ----
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.2))
+                        .frame(width: 50, height: 50)
 
-                // ---- Côté gauche : icône + nombre de pas ----
-                VStack(spacing: 6) {
-                    // Icône plus grande dans le format rectangulaire
-                    ZStack {
-                        Circle()
-                            .fill(.white.opacity(0.2))
-                            .frame(width: 50, height: 50)
-
-                        Image(systemName: "figure.walk")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-
-                    Text("\(entry.stepCount)")
-                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.white)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
+                }
 
-                    Text("pas aujourd'hui")
+                Text("\(entry.stepCount)")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+
+                Text("pas aujourd'hui")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .frame(maxWidth: .infinity)
+
+            // ---- Côté droit : détails de progression ----
+            VStack(alignment: .leading, spacing: 10) {
+
+                HStack {
+                    Image(systemName: "target")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.9))
+
+                    Text("\(Int(entry.progress * 100))%")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+
+                ProgressBarView(progress: entry.progress)
+                    .frame(height: 8)
+
+                HStack {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.7))
+
+                    Text("Objectif : \(entry.stepGoal)")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
                 }
-                .frame(maxWidth: .infinity)
 
-                // ---- Côté droit : détails de progression ----
-                VStack(alignment: .leading, spacing: 10) {
+                let remaining = max(0, entry.stepGoal - entry.stepCount)
+                HStack {
+                    Image(systemName: remaining == 0 ? "checkmark.circle.fill" : "arrow.up.circle")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.7))
 
-                    // Pourcentage de l'objectif
-                    HStack {
-                        Image(systemName: "target")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.9))
-
-                        Text("\(Int(entry.progress * 100))%")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-
-                    // Barre de progression
-                    ProgressBarView(progress: entry.progress)
-                        .frame(height: 8)
-
-                    // Objectif
-                    HStack {
-                        Image(systemName: "flag.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.7))
-
-                        Text("Objectif : \(entry.stepGoal)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-
-                    // Pas restants (ou félicitations si objectif atteint)
-                    let remaining = max(0, entry.stepGoal - entry.stepCount)
-                    HStack {
-                        Image(systemName: remaining == 0 ? "checkmark.circle.fill" : "arrow.up.circle")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.7))
-
-                        Text(remaining == 0 ? "Objectif atteint !" : "Encore \(remaining) pas")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
+                    Text(remaining == 0 ? "Objectif atteint !" : "Encore \(remaining) pas")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
                 }
-                .frame(maxWidth: .infinity)
             }
-            .padding(16)
+            .frame(maxWidth: .infinity)
         }
+        .padding(16)
     }
 }
 
