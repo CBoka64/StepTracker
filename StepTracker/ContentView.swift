@@ -72,19 +72,14 @@ struct ContentView: View {
 
     /// La vue SwiftUI rendue par ce composant.
     ///
-    /// Compose un `ZStack` avec le fond dégradé animé et le contenu adaptatif
-    /// (compact ou regular). Lance `setupHealthKit()` à l'apparition.
+    /// Compose un `ZStack` avec le contenu adaptatif (compact ou regular),
+    /// et un fond dégradé animé via `.background(.ignoresSafeArea())`.
+    ///
+    /// > Note : Le dégradé est placé dans `.background` (et non en enfant du ZStack)
+    /// > afin de couvrir toute la fenêtre — y compris la status bar et le home
+    /// > indicator — sans affecter les safe area insets du contenu.
     var body: some View {
         ZStack {
-            // Fond dégradé plein écran — change de couleur avec la progression
-            LinearGradient(
-                colors: [progressColor, progressColor.opacity(0.35)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.6), value: progressColor)
-
             // Contenu — adaptatif selon la taille d'écran
             if sizeClass == .regular {
                 regularLayout
@@ -92,6 +87,16 @@ struct ContentView: View {
                 compactLayout
             }
         }
+        .background(
+            // Fond dégradé plein écran — s'étend sous la status bar et le home indicator
+            LinearGradient(
+                colors: [progressColor, progressColor.opacity(0.35)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.6), value: progressColor)
+        )
         .task { await setupHealthKit() }
     }
 
