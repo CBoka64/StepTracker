@@ -297,6 +297,9 @@ struct ContentView: View {
         do {
             try await healthManager.requestAuthorization()
             stepCount = try await healthManager.fetchTodayStepCount()
+        } catch let error as NSError where error.domain == "com.apple.healthkit" && error.code == 5 {
+            // HealthKit non fonctionnel sur simulateur
+            errorMessage = "HealthKit nécessite un iPhone physique."
         } catch {
             errorMessage = "Erreur : \(error.localizedDescription)"
         }
