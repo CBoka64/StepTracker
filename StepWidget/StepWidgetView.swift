@@ -10,16 +10,26 @@ import WidgetKit
 
 // MARK: - Vue principale du widget
 
-/// Cette vue s'adapte automatiquement à la taille du widget (carré ou rectangulaire).
-/// Elle détecte la famille de widget via @Environment et choisit le bon layout.
+/// Vue racine du widget, qui délègue le rendu à `SmallWidgetView` ou `MediumWidgetView`
+/// selon la taille de widget choisie par l'utilisateur.
+///
+/// WidgetKit injecte automatiquement la famille via `@Environment(\.widgetFamily)`.
+/// Toute nouvelle taille supportée (`.systemLarge`, etc.) doit être ajoutée
+/// dans le `switch` de `body` ET dans `supportedFamilies` de `StepWidget`.
 struct StepWidgetView: View {
 
+    /// Données fournies par `StepWidgetProvider` pour cet instant de la timeline.
     let entry: StepEntry
 
-    // WidgetKit injecte automatiquement la taille du widget ici.
-    // .systemSmall = carré, .systemMedium = rectangulaire
+    /// Taille du widget détectée automatiquement par WidgetKit.
+    ///
+    /// `.systemSmall` = carré · `.systemMedium` = rectangulaire.
+    /// Modifiée par le système uniquement — ne pas assigner manuellement.
     @Environment(\.widgetFamily) var widgetFamily
 
+    /// La vue SwiftUI rendue par ce composant.
+    ///
+    /// Sélectionne la mise en page appropriée selon la taille du widget.
     var body: some View {
         switch widgetFamily {
         case .systemSmall:
@@ -34,16 +44,20 @@ struct StepWidgetView: View {
 
 // MARK: - Widget Carré (Small)
 
-/// Layout compact : icône de pied en haut, nombre de pas au centre,
-/// barre de progression en bas. Le tout sur un fond dégradé.
+/// Layout compact pour le widget carré (`.systemSmall`).
+///
+/// Affiche du haut vers le bas : icône de marche, nombre de pas,
+/// libellé "pas", barre de progression, objectif en petit texte.
+/// Le fond dégradé est défini dans `StepWidget.containerBackground`.
 struct SmallWidgetView: View {
+
+    /// Données fournies par le provider pour cet instant de la timeline.
     let entry: StepEntry
 
+    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
         VStack(spacing: 8) {
-            // Icône de pied
-            // On utilise le SF Symbol "figure.walk" qui est natif iOS.
-            // Pas besoin d'importer d'image custom !
+            // Icône de pied — SF Symbol natif iOS, pas besoin d'asset custom.
             Image(systemName: "figure.walk")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.white)
@@ -76,11 +90,17 @@ struct SmallWidgetView: View {
 
 // MARK: - Widget Rectangulaire (Medium)
 
-/// Layout élargi : icône + texte à gauche, stats détaillées à droite.
-/// Plus d'espace = plus d'informations affichées.
+/// Layout élargi pour le widget rectangulaire (`.systemMedium`).
+///
+/// Divise l'espace en deux colonnes :
+/// - **Gauche** : icône dans un cercle translucide + nombre de pas
+/// - **Droite** : pourcentage, barre de progression, objectif, pas restants
 struct MediumWidgetView: View {
+
+    /// Données fournies par le provider pour cet instant de la timeline.
     let entry: StepEntry
 
+    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
         HStack(spacing: 16) {
 
@@ -153,11 +173,20 @@ struct MediumWidgetView: View {
 
 // MARK: - Barre de progression réutilisable
 
-/// Une barre de progression personnalisée avec coins arrondis.
-/// Le remplissage est proportionnel au ratio steps/goal (plafonné à 100% visuellement).
+/// Barre de progression horizontale personnalisée avec coins arrondis.
+///
+/// Le remplissage est proportionnel à `progress` (plafonné à 100% visuellement
+/// grâce à `min(progress, 1.0)`), sur un fond semi-transparent blanc.
+/// Utilisée à la fois dans `SmallWidgetView` et `MediumWidgetView`.
 struct ProgressBarView: View {
+
+    /// Ratio de remplissage entre 0.0 (vide) et 1.0+ (plein).
+    ///
+    /// Les valeurs supérieures à 1.0 sont acceptées mais clampées visuellement
+    /// à la largeur totale de la barre (l'arc ne déborde pas).
     let progress: Double
 
+    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -178,9 +207,8 @@ struct ProgressBarView: View {
 
 // MARK: - Preview pour Xcode
 
-/// Ces previews te permettent de voir le widget directement dans Xcode
+/// Ces previews permettent de voir le widget directement dans Xcode
 /// sans avoir besoin de le compiler et le lancer sur un vrai iPhone.
-/// Super pratique pour itérer rapidement sur le design !
 
 #Preview("Small - Rouge (5%)", as: .systemSmall) {
     StepWidget()
