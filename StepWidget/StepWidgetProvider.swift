@@ -15,6 +15,17 @@ import SwiftUI
 
 // MARK: - Le modèle de données du widget
 
+// ═══════════════════════════════════════════════════════════════
+// ÉTAPE 1 — StepEntry : le "paquet de données" du widget
+// ═══════════════════════════════════════════════════════════════
+// Un widget WidgetKit fonctionne comme un diaporama : iOS prépare
+// à l'avance des "entrées" (StepEntry) avec les données et les dates
+// d'affichage, puis les affiche automatiquement au bon moment.
+//
+// StepEntry doit être conforme au protocole TimelineEntry, qui exige
+// une propriété "date: Date" (l'instant d'affichage de cette entrée).
+// On y ajoute nos données métier : stepCount et stepGoal.
+
 /// Paquet de données que le widget affiche à un instant précis.
 ///
 /// Conforme au protocole `TimelineEntry`, `StepEntry` encapsule les trois
@@ -34,6 +45,14 @@ struct StepEntry: TimelineEntry {
     /// Objectif quotidien défini par l'utilisateur, lu depuis l'App Group partagé.
     let stepGoal: Int
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 2 — Calculer le ratio de progression (protection division/0)
+    // ═══════════════════════════════════════════════════════════════
+    // progress est une propriété calculée (pas stockée) : Swift recalcule
+    // sa valeur chaque fois qu'on y accède.
+    // "guard stepGoal > 0" évite la division par zéro si stepGoal est 0.
+    // Une valeur > 1.0 est possible (ex: 1.2 = 120% si l'objectif est dépassé).
+
     /// Ratio de progression entre 0.0 et 1.0+ (non plafonné à 1.0).
     ///
     /// Retourner une valeur supérieure à 1.0 permet d'afficher
@@ -43,6 +62,14 @@ struct StepEntry: TimelineEntry {
         guard stepGoal > 0 else { return 0 }
         return Double(stepCount) / Double(stepGoal)
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 3 — Choisir la couleur principale selon le palier atteint
+    // ═══════════════════════════════════════════════════════════════
+    // Le "switch" sur un intervalle de valeurs est une fonctionnalité
+    // puissante de Swift. Chaque "case" couvre une plage de pourcentages.
+    // La couleur change progressivement pour motiver l'utilisateur :
+    //   Rouge → Orange → Jaune → Vert
 
     /// Retourne la couleur principale selon les paliers de progression :
     ///   - **Rouge**  : 0 % à 10 %
@@ -62,6 +89,14 @@ struct StepEntry: TimelineEntry {
             return .green
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 4 — Définir le dégradé dynamique du fond du widget
+    // ═══════════════════════════════════════════════════════════════
+    // gradientColors retourne un tableau de 2 couleurs qui forment
+    // le dégradé du fond du widget.
+    // Ce tableau est utilisé dans StepWidget.swift dans containerBackground.
+    // Chaque palier a ses propres teintes pour un effet visuel distinct.
 
     /// Dégradé dynamique utilisé comme fond du widget.
     ///
@@ -98,6 +133,18 @@ struct StepWidgetProvider: TimelineProvider {
 
     // MARK: - placeholder
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 5 — placeholder() : aperçu générique pour la galerie iOS
+    // ═══════════════════════════════════════════════════════════════
+    // Quand l'utilisateur ouvre la galerie "Ajouter un widget",
+    // iOS a besoin d'afficher un aperçu IMMÉDIATEMENT, sans attendre
+    // de données réelles. On retourne donc des données fictives.
+    // iOS peut appeler cette méthode de façon synchrone (sans async),
+    // donc pas question de lire HealthKit ici (trop lent).
+    //
+    // Les données fictives doivent être "réalistes" pour que l'aperçu
+    // soit représentatif de ce que verra l'utilisateur.
+
     /// Retourne un aperçu générique affiché dans la galerie de widgets.
     ///
     /// Les données sont fictives — il s'agit uniquement de montrer la mise en page.
@@ -115,6 +162,17 @@ struct StepWidgetProvider: TimelineProvider {
 
     // MARK: - snapshot
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 6 — getSnapshot() : aperçu rapide, données réelles si possible
+    // ═══════════════════════════════════════════════════════════════
+    // getSnapshot est appelé dans deux situations :
+    //   a) Mode preview (galerie) → on retourne des données fictives rapidement
+    //   b) Mode production (widget ajouté) → on tente de lire HealthKit
+    //
+    // "context.isPreview" permet de distinguer les deux cas.
+    // En mode production, on utilise Task {} pour lancer une opération
+    // async depuis une fonction non-async (getSnapshot n'est pas async).
+
     /// Retourne un aperçu rapide, de préférence avec les vraies données.
     ///
     /// Appelé lorsqu'iOS a besoin d'un aperçu sans délai (ex : vue de transition).
@@ -131,7 +189,14 @@ struct StepWidgetProvider: TimelineProvider {
             return
         }
 
-        // Sinon, on charge les vraies données
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 7 — Task {} : lancer du code async depuis du code synchrone
+        // ═══════════════════════════════════════════════════════════════
+        // getSnapshot n'est pas une fonction "async", mais on a besoin
+        // de lire HealthKit de façon asynchrone. Task {} crée une "coroutine"
+        // (un bloc de code qui peut faire des pauses avec await).
+        // Une fois les données prêtes, on appelle completion() pour
+        // signaler à iOS que l'entrée est disponible.
         Task {
             do {
                 let steps = try await healthManager.fetchTodayStepCount()
@@ -150,6 +215,21 @@ struct StepWidgetProvider: TimelineProvider {
 
     // MARK: - timeline
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 8 — getTimeline() : la méthode principale en production
+    // ═══════════════════════════════════════════════════════════════
+    // C'est la méthode la plus importante : iOS l'appelle régulièrement
+    // pour savoir quelles données afficher ET quand se réveiller
+    // pour les mettre à jour.
+    //
+    // Elle construit une "Timeline" = une liste d'entrées planifiées
+    // + une politique de rafraîchissement.
+    //
+    // Notre timeline ne contient qu'UNE entrée (les données actuelles)
+    // car les pas changent en temps réel. On demande un rafraîchissement
+    // toutes les 15 minutes, ce qui est un bon compromis entre fraîcheur
+    // et économie de batterie.
+
     /// Construit la timeline du widget et planifie son prochain rafraîchissement.
     ///
     /// C'est la méthode principale en production. Elle lit les vrais pas via HealthKit
@@ -166,20 +246,44 @@ struct StepWidgetProvider: TimelineProvider {
         Task {
             do {
                 let steps = try await healthManager.fetchTodayStepCount()
+
+                // ═══════════════════════════════════════════════════════════════
+                // ÉTAPE 9 — Construire l'entrée avec les vraies données
+                // ═══════════════════════════════════════════════════════════════
+                // On crée un StepEntry avec :
+                //   - date: Date() = maintenant (afficher immédiatement)
+                //   - stepCount: les vrais pas lus depuis HealthKit
+                //   - stepGoal: l'objectif lu depuis les UserDefaults partagés
                 let entry = StepEntry(
                     date: Date(),
                     stepCount: steps,
                     stepGoal: healthManager.stepGoal
                 )
 
-                // Rafraîchissement demandé dans 15 minutes.
-                // .after signifie : "après cette date, redemande-moi une timeline".
+                // ═══════════════════════════════════════════════════════════════
+                // ÉTAPE 10 — Calculer la date du prochain rafraîchissement
+                // ═══════════════════════════════════════════════════════════════
+                // On dit à iOS : "Reviens me voir dans 15 minutes pour de
+                // nouvelles données." 15 minutes = 900 secondes.
+                // Le fallback "?? Date().addingTimeInterval(900)" s'applique
+                // si Calendar.current.date() retourne nil (très rare).
                 let nextUpdate = Calendar.current.date(
                     byAdding: .minute,
                     value: 15,
                     to: Date()
                 ) ?? Date().addingTimeInterval(900)
 
+                // ═══════════════════════════════════════════════════════════════
+                // ÉTAPE 11 — Créer et soumettre la Timeline à iOS
+                // ═══════════════════════════════════════════════════════════════
+                // Timeline(entries:policy:) :
+                //   - entries: la liste de StepEntry à afficher (une seule ici)
+                //   - policy: .after(nextUpdate) = demander un nouveau refresh
+                //     après la date nextUpdate.
+                //
+                // Autres politiques possibles :
+                //   - .atEnd : refresh après la dernière entrée de la liste
+                //   - .never : ne jamais rafraîchir automatiquement
                 let timeline = Timeline(
                     entries: [entry],
                     policy: .after(nextUpdate)
@@ -187,7 +291,14 @@ struct StepWidgetProvider: TimelineProvider {
                 completion(timeline)
 
             } catch {
-                // En cas d'erreur, on affiche 0 et on réessaie dans 15 min
+                // ═══════════════════════════════════════════════════════════════
+                // ÉTAPE 12 — Gérer l'erreur : afficher 0 pas et réessayer dans 15 min
+                // ═══════════════════════════════════════════════════════════════
+                // Si HealthKit échoue (permission refusée, appareil non compatible...),
+                // on affiche 0 pas plutôt que de crasher.
+                // On planifie quand même un refresh dans 15 min pour que le widget
+                // réessaie automatiquement (l'utilisateur aura peut-être accordé
+                // les permissions entre-temps).
                 let entry = StepEntry(
                     date: Date(),
                     stepCount: 0,

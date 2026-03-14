@@ -23,29 +23,44 @@ import WidgetKit
 /// - **regular** (iPad/Mac) → `regularLayout` (deux colonnes côte à côte)
 struct ContentView: View {
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 1 — Déclarer les variables d'état (@State) de la vue
+    // ═══════════════════════════════════════════════════════════════
+    // @State est une annotation SwiftUI qui dit : "quand cette variable
+    // change, recrée automatiquement l'affichage."
+    // Ces 4 variables représentent l'état complet de la vue :
+
     /// Nombre de pas du jour, chargé depuis HealthKit au lancement de la vue.
     ///
     /// Initialisé à `0` et mis à jour après la résolution de la requête HealthKit.
     /// Déclenche une transition animée via `.contentTransition(.numericText())`.
-    @State private var stepCount: Int = 0
+    @State private var stepCount: Int = 0          // Commence à 0, mis à jour après lecture HealthKit
 
     /// Objectif quotidien en nombre de pas, lu depuis l'App Group partagé.
     ///
     /// Toute modification est immédiatement persistée dans `HealthKitManager.stepGoal`
     /// et déclenche un rechargement du widget via `WidgetCenter.shared.reloadAllTimelines()`.
-    @State private var stepGoal: Int = HealthKitManager.shared.stepGoal
+    @State private var stepGoal: Int = HealthKitManager.shared.stepGoal  // Valeur sauvegardée (défaut 10 000)
 
     /// Indique si le chargement HealthKit est en cours.
     ///
     /// Pendant le chargement, l'anneau est atténué et un `ProgressView` est affiché
     /// au centre. Passe à `false` dès que la requête se termine (succès ou erreur).
-    @State private var isLoading: Bool = true
+    @State private var isLoading: Bool = true      // true = en train de charger
 
     /// Message d'erreur affiché dans `errorBanner` si HealthKit échoue.
     ///
     /// `nil` tant qu'aucune erreur ne s'est produite. Alimenté par le bloc `catch`
     /// de `setupHealthKit()` ou si HealthKit n'est pas disponible sur l'appareil.
-    @State private var errorMessage: String?
+    @State private var errorMessage: String?       // nil = pas d'erreur
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 2 — Lire la taille d'écran via @Environment
+    // ═══════════════════════════════════════════════════════════════
+    // @Environment permet de lire des informations du système.
+    // horizontalSizeClass indique si l'écran est "compact" (iPhone)
+    // ou "regular" (iPad plein écran, Mac). Cela permet d'adapter
+    // automatiquement la mise en page sans écrire deux apps séparées.
 
     /// Taille horizontale de l'écran, injectée par SwiftUI.
     ///
@@ -55,6 +70,14 @@ struct ContentView: View {
 
     /// Référence au singleton `HealthKitManager` pour l'autorisation et la lecture des pas.
     private let healthManager = HealthKitManager.shared
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 3 — Calculer le ratio de progression (pas / objectif)
+    // ═══════════════════════════════════════════════════════════════
+    // "progress" est une propriété calculée : elle est recalculée
+    // automatiquement à chaque fois que stepCount ou stepGoal change.
+    // Exemple : 6 500 pas / 10 000 objectif = 0.65 (soit 65%).
+    // La protection "stepGoal > 0" évite une division par zéro.
 
     /// Ratio pas / objectif, entre 0.0 et 1.0+.
     ///
@@ -70,6 +93,14 @@ struct ContentView: View {
     /// du fond dégradé plein écran, animée lors des transitions.
     private var progressColor: Color { colorForProgress(progress) }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 4 — Construire l'interface dans "body"
+    // ═══════════════════════════════════════════════════════════════
+    // "body" est la propriété obligatoire de toute vue SwiftUI.
+    // Elle décrit CE QUE l'utilisateur voit. SwiftUI recrée cette vue
+    // automatiquement chaque fois qu'un @State change.
+    // Le ZStack superpose le fond dégradé ET le contenu par-dessus.
+
     /// La vue SwiftUI rendue par ce composant.
     ///
     /// Compose un `ZStack` avec le contenu adaptatif (compact ou regular),
@@ -80,7 +111,12 @@ struct ContentView: View {
     /// > indicator — sans affecter les safe area insets du contenu.
     var body: some View {
         ZStack {
-            // Contenu — adaptatif selon la taille d'écran
+            // ═══════════════════════════════════════════════════════════════
+            // ÉTAPE 5 — Choisir le layout selon la taille d'écran
+            // ═══════════════════════════════════════════════════════════════
+            // Si l'écran est "regular" (iPad) → deux colonnes côte à côte.
+            // Sinon (iPhone, compact) → une colonne verticale avec scroll.
+            // Cette condition est évaluée à chaque rotation d'écran.
             if sizeClass == .regular {
                 regularLayout
             } else {
@@ -89,6 +125,8 @@ struct ContentView: View {
         }
         .background(
             // Fond dégradé plein écran — s'étend sous la status bar et le home indicator
+            // Le gradient est dans .background (pas dans le ZStack) pour couvrir
+            // toute la fenêtre y compris les safe areas (barre de statut, home indicator).
             LinearGradient(
                 colors: [progressColor, progressColor.opacity(0.35)],
                 startPoint: .topLeading,
@@ -97,10 +135,23 @@ struct ContentView: View {
             .ignoresSafeArea()
             .animation(.easeInOut(duration: 0.6), value: progressColor)
         )
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 6 — Déclencher le chargement HealthKit à l'apparition
+        // ═══════════════════════════════════════════════════════════════
+        // .task {} exécute une fonction asynchrone (async) quand la vue
+        // apparaît à l'écran pour la première fois. C'est l'équivalent
+        // de "au démarrage, fais ça en arrière-plan sans bloquer l'UI."
         .task { await setupHealthKit() }
     }
 
     // MARK: - Layout compact (iPhone)
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 7 — Layout iPhone : ScrollView + VStack vertical
+    // ═══════════════════════════════════════════════════════════════
+    // ScrollView permet de faire défiler le contenu si l'écran est
+    // trop petit. VStack empile les éléments verticalement avec
+    // un espacement de 28 points entre chaque bloc.
 
     /// Layout vertical pour iPhone et tailles d'écran compactes.
     ///
@@ -157,6 +208,15 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 8 — Afficher l'anneau de progression ou le spinner
+    // ═══════════════════════════════════════════════════════════════
+    // Pendant le chargement (isLoading == true), on montre un spinner
+    // blanc et l'anneau est atténué (opacity 0.4).
+    // Une fois les données arrivées, l'anneau se remplit avec une
+    // animation (easeOut 0.8s) et le compteur numérique apparaît.
+    // .contentTransition(.numericText()) anime le changement de chiffre.
+
     /// Anneau de progression circulaire centré avec le compteur de pas à l'intérieur.
     ///
     /// Pendant le chargement, affiche un `ProgressView` blanc et atténue l'anneau.
@@ -198,6 +258,14 @@ struct ContentView: View {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 9 — Afficher les 3 statistiques dans une rangée
+    // ═══════════════════════════════════════════════════════════════
+    // HStack place les éléments côte à côte horizontalement.
+    // Les 3 cellules (StepStatItem) partagent l'espace équitablement.
+    // Pendant le chargement, on affiche "—" à la place des chiffres
+    // pour signaler que les données ne sont pas encore disponibles.
+
     /// Rangée de 3 statistiques : pas du jour, pourcentage, pas restants.
     ///
     /// Les cellules sont séparées par `divider` et affichent "—" pendant le chargement.
@@ -230,6 +298,14 @@ struct ContentView: View {
             .frame(width: 1, height: 36)
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 10 — Carte de réglage de l'objectif avec Stepper
+    // ═══════════════════════════════════════════════════════════════
+    // Le Stepper permet d'augmenter/diminuer stepGoal par pas de 500,
+    // avec un minimum de 1 000 et un maximum de 50 000 pas.
+    // Les boutons GoalButton offrent des raccourcis vers les valeurs
+    // les plus courantes (5 000, 8 000, 10 000, 15 000).
+
     /// Carte de réglage de l'objectif quotidien avec stepper et boutons raccourcis.
     ///
     /// Toute modification déclenche :
@@ -251,6 +327,17 @@ struct ContentView: View {
                     .foregroundColor(.white)
             }
             .tint(.white)
+            // ═══════════════════════════════════════════════════════════════
+            // ÉTAPE 11 — Réagir au changement d'objectif et mettre à jour le widget
+            // ═══════════════════════════════════════════════════════════════
+            // .onChange(of:) est appelé automatiquement chaque fois que
+            // stepGoal change (bouton + ou - du Stepper, ou bouton raccourci).
+            // On fait deux choses :
+            //   1. Sauvegarder la nouvelle valeur dans les UserDefaults partagés
+            //      (HealthKitManager.stepGoal) pour que le widget puisse la lire.
+            //   2. Demander à iOS de mettre à jour immédiatement le widget
+            //      (WidgetCenter.shared.reloadAllTimelines()), sinon le widget
+            //      n'afficherait le nouvel objectif qu'au prochain cycle de 15 min.
             .onChange(of: stepGoal) { _, newValue in
                 healthManager.stepGoal = newValue
                 WidgetCenter.shared.reloadAllTimelines()
@@ -284,6 +371,19 @@ struct ContentView: View {
 
     // MARK: - HealthKit
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 12 — Demander l'autorisation HealthKit puis charger les pas
+    // ═══════════════════════════════════════════════════════════════
+    // Cette fonction est "async" : elle peut faire une pause (await)
+    // sans bloquer l'interface. Le mot-clé "try" indique qu'elle peut
+    // échouer et lancer une erreur, capturée par le bloc "catch".
+    //
+    // Ordre d'exécution :
+    //   a) Vérifier si HealthKit est disponible sur cet appareil
+    //   b) Demander la permission à l'utilisateur (pop-up système)
+    //   c) Lire les pas du jour depuis l'app Santé
+    //   d) Mettre fin au chargement (isLoading = false)
+
     /// Demande l'autorisation HealthKit puis charge les pas du jour.
     ///
     /// Appelée une seule fois via `.task { }` à l'apparition de la vue.
@@ -308,6 +408,17 @@ struct ContentView: View {
 
     // MARK: - Couleur selon progression
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 13 — Choisir la couleur selon le niveau de progression
+    // ═══════════════════════════════════════════════════════════════
+    // Cette fonction reçoit le ratio (0.0 → 1.0+) et retourne une couleur.
+    // La logique est simple : plus on avance vers l'objectif,
+    // plus la couleur "chauffe" du rouge vers le vert.
+    //   0 à 10%   → Rouge   (départ, motivation !)
+    //   11 à 50%  → Orange  (en route)
+    //   51 à 80%  → Jaune   (bonne progression)
+    //   81%+      → Vert    (objectif quasi atteint ou dépassé)
+
     /// Retourne la couleur associée à un ratio de progression.
     ///
     /// | Plage (%) | Couleur               |
@@ -330,6 +441,18 @@ struct ContentView: View {
 }
 
 // MARK: - Anneau de progression circulaire
+
+// ═══════════════════════════════════════════════════════════════
+// ÉTAPE 14 — Dessiner l'anneau circulaire avec Circle().trim()
+// ═══════════════════════════════════════════════════════════════
+// CircularProgressRing est un composant réutilisable (struct View séparée).
+// Il dessine deux cercles superposés dans un ZStack :
+//   1. Un cercle de fond semi-transparent (le "track" gris)
+//   2. Un arc coloré par-dessus, dont la longueur = progress × 360°
+//
+// .trim(from: 0, to: progress) coupe le cercle à la valeur de progression.
+// .rotationEffect(-90°) fait démarrer l'arc à 12h (au lieu de 3h par défaut).
+// .lineCap: .round arrondit les extrémités de l'arc pour un effet soigné.
 
 /// Anneau de progression circulaire réutilisable.
 ///
@@ -399,6 +522,18 @@ struct StepStatItem: View {
 }
 
 // MARK: - Bouton raccourci d'objectif
+
+// ═══════════════════════════════════════════════════════════════
+// ÉTAPE 15 — Bouton raccourci avec @Binding pour modifier le parent
+// ═══════════════════════════════════════════════════════════════
+// @Binding est différent de @State : il ne crée PAS la variable,
+// il reçoit un "lien" vers une variable qui existe dans la vue parente.
+// Quand GoalButton modifie currentGoal, c'est DIRECTEMENT le stepGoal
+// de ContentView qui est modifié — pas une copie locale.
+// C'est le mécanisme de communication enfant → parent en SwiftUI.
+//
+// Visuellement : si goal == currentGoal, le bouton est blanc opaque
+// (= sélectionné). Sinon il est semi-transparent.
 
 /// Bouton de sélection rapide d'un objectif prédéfini.
 ///

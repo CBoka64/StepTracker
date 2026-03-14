@@ -18,17 +18,44 @@ import HealthKit
 /// bloquer le thread principal. On l'utilise toujours via le singleton `shared`.
 class HealthKitManager {
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 1 — Créer un singleton : une seule instance partagée
+    // ═══════════════════════════════════════════════════════════════
+    // Un "singleton" est un objet dont il n'existe qu'une seule copie
+    // dans toute l'application. On y accède via "HealthKitManager.shared".
+    // C'est la recommandation Apple pour HKHealthStore : créer plusieurs
+    // instances serait un gaspillage de ressources.
+    //
+    // "static let" signifie que cette propriété appartient à la CLASSE
+    // (pas à une instance), et qu'elle ne changera jamais (let = constante).
+
     /// Singleton partagé entre l'app et le widget.
     ///
     /// Utiliser `HealthKitManager.shared` garantit qu'une seule instance
     /// du `HKHealthStore` est créée, conformément aux recommandations Apple.
     static let shared = HealthKitManager()
 
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 2 — Créer le "coffre-fort" d'accès aux données Santé
+    // ═══════════════════════════════════════════════════════════════
+    // HKHealthStore est la porte d'entrée vers l'app Santé d'Apple.
+    // Toutes les requêtes (lecture de pas, autorisation) passent par cet objet.
+    // "private" = seul ce fichier peut l'utiliser, pas l'extérieur.
+
     /// Point d'accès unique aux données HealthKit.
     ///
     /// `HKHealthStore` est le "coffre-fort" de l'app Santé : toutes les requêtes
     /// de lecture et les demandes d'autorisation passent par cet objet.
     private let healthStore = HKHealthStore()
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 3 — Identifier le type de donnée qu'on veut lire : les pas
+    // ═══════════════════════════════════════════════════════════════
+    // HealthKit gère des dizaines de types de données (poids, fréquence
+    // cardiaque, sommeil, pas...). On doit préciser exactement ce qu'on
+    // veut lire avec un identifiant. ".stepCount" = nombre de pas.
+    // Le "!" (force-unwrap) est sûr ici car .stepCount est un identifiant
+    // connu d'Apple qui ne sera jamais nil.
 
     /// Type de donnée lu : le nombre de pas (`HKQuantityTypeIdentifier.stepCount`).
     ///
@@ -37,6 +64,14 @@ class HealthKitManager {
     private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
 
     // MARK: - Vérifier la disponibilité de HealthKit
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 4 — Vérifier si HealthKit est disponible sur l'appareil
+    // ═══════════════════════════════════════════════════════════════
+    // Tous les appareils Apple ne supportent pas HealthKit.
+    // Exemple : certains anciens iPad ou Mac sans l'app Santé.
+    // On DOIT vérifier AVANT d'utiliser HealthKit pour éviter un crash.
+    // Cette propriété calculée retourne true ou false.
 
     /// Indique si HealthKit est disponible sur cet appareil.
     ///
@@ -47,6 +82,21 @@ class HealthKitManager {
     }
 
     // MARK: - Demander l'autorisation
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 5 — Demander la permission à l'utilisateur de lire ses pas
+    // ═══════════════════════════════════════════════════════════════
+    // iOS affiche automatiquement une pop-up système demandant à l'utilisateur
+    // s'il accepte de partager ses données de pas avec l'app.
+    // Cette pop-up n'apparaît qu'UNE SEULE FOIS — iOS mémorise le choix.
+    //
+    // "async throws" signifie :
+    //   - "async" : cette fonction peut faire une pause (elle attend la réponse
+    //     de l'utilisateur) sans bloquer le reste de l'app.
+    //   - "throws" : elle peut échouer et lancer une erreur (ex : HealthKit
+    //     non disponible).
+    //
+    // On ne demande que la LECTURE (toRead), pas l'écriture (toShare vide).
 
     /// Demande à l'utilisateur la permission de lire ses données de pas.
     ///
@@ -83,7 +133,16 @@ class HealthKitManager {
             throw HealthKitError.notAvailable
         }
 
-        // Predicate : uniquement les données entre minuit et maintenant.
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 6 — Définir la plage horaire : de minuit à maintenant
+        // ═══════════════════════════════════════════════════════════════
+        // On veut uniquement les pas d'aujourd'hui, donc on calcule :
+        //   - startOfDay : minuit (00:00:00) du jour en cours
+        //   - Date() : l'instant présent
+        // "predicateForSamples" crée un filtre qui dit à HealthKit :
+        // "ne me donne que les données dans cet intervalle de temps."
+        // .strictStartDate = on exclut les données exactement à minuit
+        // (bord gauche exclu) pour éviter les doublons avec la veille.
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: Date())
         let predicate = HKQuery.predicateForSamples(
@@ -92,8 +151,16 @@ class HealthKitManager {
             options: .strictStartDate
         )
 
-        // API async/await de HealthKit (iOS 15.4+).
-        // .cumulativeSum additionne tous les échantillons de la journée.
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 7 — Construire la requête HealthKit
+        // ═══════════════════════════════════════════════════════════════
+        // HKStatisticsQueryDescriptor est l'API moderne (iOS 15.4+) pour
+        // faire des requêtes statistiques sur HealthKit avec async/await.
+        // ".cumulativeSum" additionne tous les échantillons de la journée :
+        //   - Pas enregistrés par l'iPhone (baromètre + accéléromètre)
+        //   - Pas enregistrés par l'Apple Watch (si présente)
+        //   - HealthKit déduplique automatiquement si les deux enregistrent
+        //     la même marche.
         let descriptor = HKStatisticsQueryDescriptor(
             predicate: HKSamplePredicate.quantitySample(
                 type: stepType,
@@ -102,18 +169,39 @@ class HealthKitManager {
             options: .cumulativeSum
         )
 
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 8 — Exécuter la requête et attendre le résultat
+        // ═══════════════════════════════════════════════════════════════
+        // "try await" signifie :
+        //   - "try" : cette ligne peut lancer une erreur (capturée par catch)
+        //   - "await" : on fait une pause ici et on reprend quand iOS
+        //     a fini d'interroger la base HealthKit (sans bloquer l'UI)
         let result = try await descriptor.result(for: healthStore)
 
         // Extrait la somme et la convertit en entier.
         // Retourne 0 si aucune donnée n'existe pour aujourd'hui.
+        // "guard let" = si result est nil (pas de données), on retourne 0.
         guard let sum = result?.sumQuantity() else {
             return 0
         }
 
+        // .count() = l'unité "nombre de pas" (sans dimension comme kg ou km)
         return Int(sum.doubleValue(for: .count()))
     }
 
     // MARK: - Gestion de l'objectif de pas
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 9 — Accéder aux UserDefaults partagés (App Group)
+    // ═══════════════════════════════════════════════════════════════
+    // Normalement, l'app et le widget ne peuvent pas partager de données
+    // car iOS les isole dans des "sandbox" séparés.
+    // L'App Group est une exception : c'est un espace commun autorisé
+    // par Apple via les entitlements (fichier .entitlements).
+    //
+    // UserDefaults avec un "suiteName" (App Group ID) permet de stocker
+    // de petites valeurs (nombres, textes) accessibles par les deux targets.
+    // Si l'identifiant est incorrect → sharedDefaults retourne nil.
 
     /// UserDefaults du groupe d'apps, accessible par l'app ET le widget.
     ///
@@ -123,6 +211,20 @@ class HealthKitManager {
     private var sharedDefaults: UserDefaults? {
         return UserDefaults(suiteName: "group.com.bc046.stepttracker")
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAPE 10 — Propriété stepGoal : lecture et écriture persistantes
+    // ═══════════════════════════════════════════════════════════════
+    // Cette propriété a un "getter" (lire) et un "setter" (écrire).
+    //
+    // GET : On lit la valeur depuis les UserDefaults partagés.
+    //   - Si la valeur est 0 (jamais enregistrée), on retourne 10 000
+    //     comme valeur par défaut (recommandation OMS).
+    //
+    // SET : On écrit la nouvelle valeur dans les UserDefaults partagés.
+    //   - Le widget peut alors lire cette valeur au prochain rafraîchissement.
+    //
+    // "var" + "get/set" = propriété calculée avec persistance externalisée.
 
     /// Objectif quotidien de pas, lu et écrit dans l'App Group partagé.
     ///
