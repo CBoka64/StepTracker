@@ -9,7 +9,10 @@
 
 Application iOS de suivi de pas avec widget dynamique. Le widget change de couleur en temps réel selon votre progression vers l'objectif quotidien.
 
+[![Swift](https://github.com/CBoka64/StepTracker/actions/workflows/swift.yml/badge.svg)](https://github.com/CBoka64/StepTracker/actions/workflows/swift.yml)
+[![iOS](https://github.com/CBoka64/StepTracker/actions/workflows/ios.yml/badge.svg)](https://github.com/CBoka64/StepTracker/actions/workflows/ios.yml)
 ---
+
 
 ## Aperçu
 
