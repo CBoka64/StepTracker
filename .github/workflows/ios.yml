@@ -13,28 +13,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Detect scheme
-      run: |
-        scheme=$(xcodebuild -list -json | python3 -c "
-        import sys, json
-        data = json.load(sys.stdin)
-        print(data['project']['schemes'][0])
-        ")
-        echo "scheme=$scheme" >> $GITHUB_ENV
-
-    - name: Detect simulator
-      run: |
-        simulator=$(xcrun xctrace list devices 2>&1 \
-          | grep -oE 'iPhone[^(]+\(([0-9.]+)\)' \
-          | head -1 \
-          | sed 's/^ *//')
-        echo "simulator=$simulator" >> $GITHUB_ENV
-
     - name: Build
       run: |
         xcodebuild \
           -project StepTracker.xcodeproj \
-          -scheme "$scheme" \
-          -destination "platform=iOS Simulator,name=$simulator" \
+          -scheme StepTracker \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
           CODE_SIGNING_ALLOWED=NO \
           build
