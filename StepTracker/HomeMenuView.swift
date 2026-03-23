@@ -31,77 +31,78 @@ struct HomeMenuView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
 
-                // En-tête
-                VStack(spacing: 10) {
-                    Image(systemName: "figure.walk.circle.fill")
-                        .font(.system(size: 56, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
+                    // En-tête
+                    VStack(spacing: 10) {
+                        Image(systemName: "figure.walk.circle.fill")
+                            .font(.system(size: 56, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
 
-                    Text("StepTracker")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        Text("StepTracker")
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
 
-                    Text("Que voulez-vous consulter ?")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(.white.opacity(0.65))
-                }
-                .padding(.top, 48)
-                .padding(.bottom, 40)
-
-                // Cartes de navigation
-                VStack(spacing: 14) {
-                    NavigationLink(value: AppPage.permissions) {
-                        MenuItemCard(
-                            icon: "hand.raised.fill",
-                            title: "Permissions HealthKit",
-                            subtitle: "Gérer l'accès aux données de santé",
-                            isDefault: false  // Pas de page par défaut pour les permissions
-                        )
+                        Text("Que voulez-vous consulter ?")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(.white.opacity(0.65))
                     }
-                    .buttonStyle(.plain)
+                    .padding(.top, 48)
+                    .padding(.bottom, 40)
 
-                    NavigationLink(value: AppPage.steps) {
-                        MenuItemCard(
-                            icon: "figure.walk",
-                            title: "Suivi des pas",
-                            subtitle: "Pas du jour, objectif et progression",
-                            isDefault: defaultPage == AppPage.steps.rawValue
-                        )
+                    // Cartes de navigation
+                    VStack(spacing: 14) {
+                        NavigationLink(value: AppPage.permissions) {
+                            MenuItemCard(
+                                icon: "hand.raised.fill",
+                                title: "Permissions HealthKit",
+                                subtitle: "Gérer l'accès aux données de santé",
+                                isDefault: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink(value: AppPage.steps) {
+                            MenuItemCard(
+                                icon: "figure.walk",
+                                title: "Suivi des pas",
+                                subtitle: "Pas du jour, objectif et progression",
+                                isDefault: defaultPage == AppPage.steps.rawValue
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink(value: AppPage.sleep) {
+                            MenuItemCard(
+                                icon: "moon.zzz.fill",
+                                title: "Suivi du sommeil",
+                                subtitle: "Durée et qualité de votre sommeil",
+                                isDefault: defaultPage == AppPage.sleep.rawValue
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink(value: AppPage.dashboard) {
+                            MenuItemCard(
+                                icon: "chart.bar.fill",
+                                title: "Dashboard",
+                                subtitle: "Vue d'ensemble de votre activité",
+                                isDefault: defaultPage == AppPage.dashboard.rawValue
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
 
-                    NavigationLink(value: AppPage.sleep) {
-                        MenuItemCard(
-                            icon: "moon.zzz.fill",
-                            title: "Suivi du sommeil",
-                            subtitle: "Durée et qualité de votre sommeil",
-                            isDefault: defaultPage == AppPage.sleep.rawValue
-                        )
+                    // Indicateur de page par défaut active
+                    if let page = AppPage(rawValue: defaultPage) {
+                        Label("Accueil : \(page.displayName)", systemImage: "house.fill")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.45))
+                            .padding(.top, 32)
+                            .padding(.bottom, 24)
                     }
-                    .buttonStyle(.plain)
-
-                    NavigationLink(value: AppPage.dashboard) {
-                        MenuItemCard(
-                            icon: "chart.bar.fill",
-                            title: "Dashboard",
-                            subtitle: "Vue d'ensemble de votre activité",
-                            isDefault: defaultPage == AppPage.dashboard.rawValue
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 20)
-
-                Spacer()
-
-                // Indicateur de page par défaut active
-                if let page = AppPage(rawValue: defaultPage) {
-                    Label("Accueil : \(page.displayName)", systemImage: "house.fill")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(.white.opacity(0.45))
-                        .padding(.bottom, 24)
                 }
             }
         }
