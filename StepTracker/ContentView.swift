@@ -110,37 +110,36 @@ struct ContentView: View {
     /// > afin de couvrir toute la fenêtre — y compris la status bar et le home
     /// > indicator — sans affecter les safe area insets du contenu.
     var body: some View {
-        ZStack {
-            // ═══════════════════════════════════════════════════════════════
-            // ÉTAPE 5 — Choisir le layout selon la taille d'écran
-            // ═══════════════════════════════════════════════════════════════
-            // Si l'écran est "regular" (iPad) → deux colonnes côte à côte.
-            // Sinon (iPhone, compact) → une colonne verticale avec scroll.
-            // Cette condition est évaluée à chaque rotation d'écran.
-            if sizeClass == .regular {
-                regularLayout
-            } else {
-                compactLayout
+        // ═══════════════════════════════════════════════════════════════
+        // ÉTAPE 5 — GeometryReader : lire la taille réelle de l'écran
+        // ═══════════════════════════════════════════════════════════════
+        // GeometryReader donne accès aux dimensions disponibles (width/height)
+        // à l'exécution, sur le vrai appareil. On calcule le diamètre de
+        // l'anneau en pourcentage de la largeur d'écran pour qu'il s'adapte
+        // automatiquement : iPhone SE (375 pt), iPhone 15 Pro Max (430 pt), iPad, etc.
+        GeometryReader { geometry in
+            let isRegular = sizeClass == .regular
+            let ringDiameter: CGFloat = isRegular
+                ? min(geometry.size.width * 0.38, 300)   // iPad : 38 % de la largeur
+                : min(geometry.size.width * 0.58, 260)   // iPhone : 58 % de la largeur
+
+            ZStack {
+                if isRegular {
+                    regularLayout(ringDiameter: ringDiameter)
+                } else {
+                    compactLayout(ringDiameter: ringDiameter)
+                }
             }
-        }
-        .background(
-            // Fond dégradé plein écran — s'étend sous la status bar et le home indicator
-            // Le gradient est dans .background (pas dans le ZStack) pour couvrir
-            // toute la fenêtre y compris les safe areas (barre de statut, home indicator).
-            LinearGradient(
-                colors: [progressColor, progressColor.opacity(0.35)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            .background(
+                LinearGradient(
+                    colors: [progressColor, progressColor.opacity(0.35)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.6), value: progressColor)
             )
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.6), value: progressColor)
-        )
-        // ═══════════════════════════════════════════════════════════════
-        // ÉTAPE 6 — Déclencher le chargement HealthKit à l'apparition
-        // ═══════════════════════════════════════════════════════════════
-        // .task {} exécute une fonction asynchrone (async) quand la vue
-        // apparaît à l'écran pour la première fois. C'est l'équivalent
-        // de "au démarrage, fais ça en arrière-plan sans bloquer l'UI."
+        }
         .task { await setupHealthKit() }
     }
 
@@ -157,11 +156,12 @@ struct ContentView: View {
     ///
     /// Empile verticalement dans un `ScrollView` : titre, anneau,
     /// rangée de stats, carte d'objectif et (si besoin) bandeau d'erreur.
-    private var compactLayout: some View {
+    /// `ringDiameter` est calculé depuis `GeometryReader` dans `body`.
+    private func compactLayout(ringDiameter: CGFloat) -> some View {
         ScrollView {
             VStack(spacing: 28) {
                 headerTitle
-                ringSection
+                ringSection(diameter: ringDiameter)
                 statsRow
                 goalCard
                 if let error = errorMessage { errorBanner(error) }
@@ -177,12 +177,13 @@ struct ContentView: View {
     ///
     /// Colonne gauche : titre + anneau + stats + bandeau d'erreur.
     /// Colonne droite : carte de réglage de l'objectif.
-    private var regularLayout: some View {
+    /// `ringDiameter` est calculé depuis `GeometryReader` dans `body`.
+    private func regularLayout(ringDiameter: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 40) {
             // Colonne gauche : anneau
             VStack(spacing: 20) {
                 headerTitle
-                ringSection
+                ringSection(diameter: ringDiameter)
                 statsRow
                 if let error = errorMessage { errorBanner(error) }
             }
@@ -221,14 +222,16 @@ struct ContentView: View {
     ///
     /// Pendant le chargement, affiche un `ProgressView` blanc et atténue l'anneau.
     /// Une fois chargé, anime le remplissage de l'arc et le compteur numérique.
-    private var ringSection: some View {
+    /// `diameter` est calculé dynamiquement depuis `GeometryReader` pour s'adapter
+    /// à la taille réelle de l'écran (iPhone SE, iPhone 15 Pro Max, iPad…).
+    private func ringSection(diameter: CGFloat) -> some View {
         VStack(spacing: 12) {
             ZStack {
                 CircularProgressRing(
                     progress: isLoading ? 0 : progress,
                     color: .white
                 )
-                .frame(width: 220, height: 220)
+                .frame(width: diameter, height: diameter)
                 .opacity(isLoading ? 0.4 : 1)
                 .animation(.easeOut(duration: 0.8), value: progress)
 
@@ -239,13 +242,17 @@ struct ContentView: View {
                 } else {
                     VStack(spacing: 4) {
                         Text("\(stepCount)")
-                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            // Taille de police proportionnelle au diamètre (≈ 22 %)
+                            // 220 pt × 0.22 ≈ 48 pt (valeur d'origine)
+                            .font(.system(size: diameter * 0.22, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .contentTransition(.numericText())
                             .animation(.easeOut, value: stepCount)
 
                         Text("pas")
-                            .font(.system(size: 15, weight: .medium))
+                            // Taille de police proportionnelle au diamètre (≈ 7 %)
+                            // 220 pt × 0.07 ≈ 15 pt (valeur d'origine)
+                            .font(.system(size: diameter * 0.07, weight: .medium))
                             .foregroundColor(.white.opacity(0.75))
                     }
                 }
