@@ -1,0 +1,66 @@
+included:
+  - StepTracker
+  - StepWidget
+
+excluded:
+  - .build
+  - DerivedData
+
+disabled_rules:
+  - trailing_whitespace     # Géré par l'éditeur
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - closure_spacing
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - literal_expression_end_indentation
+  - multiline_arguments
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - sorted_imports
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - vertical_whitespace_closing_braces
+
+line_length:
+  warning: 120
+  error: 200
+  ignores_urls: true
+  ignores_comments: true
+
+type_body_length:
+  warning: 300
+  error: 500
+
+file_length:
+  warning: 500
+  error: 1000
+
+function_body_length:
+  warning: 60
+  error: 100
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - p
+
+force_cast: warning
+force_try: warning
+
+custom_rules:
+  no_print_in_production:
+    name: "No print() in production code"
+    regex: '^\s*print\('
+    message: "Utilise os_log ou un logger dédié à la place de print()"
+    severity: warning
