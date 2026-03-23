@@ -1,9 +1,10 @@
 // StepWidgetView.swift
 // StepWidgetExtension
 //
-// C'est ici que tout le design visuel du widget est défini.
-// On crée deux vues : une pour le format carré (small) et une pour le rectangulaire (medium).
-// Le dégradé de couleur change dynamiquement selon la progression.
+// Design visuel du widget. Trois états possibles :
+//   - .loaded      → affiche les vraies données (pas + objectif + barre)
+//   - .unavailable → HealthKit absent sur cet appareil (certains iPad)
+//   - .unauthorized → l'app principale doit être ouverte pour autoriser l'accès
 
 import SwiftUI
 import WidgetKit
@@ -13,42 +14,13 @@ import WidgetKit
 /// Vue racine du widget, qui délègue le rendu à `SmallWidgetView` ou `MediumWidgetView`
 /// selon la taille de widget choisie par l'utilisateur.
 ///
-/// WidgetKit injecte automatiquement la famille via `@Environment(\.widgetFamily)`.
-/// Toute nouvelle taille supportée (`.systemLarge`, etc.) doit être ajoutée
-/// dans le `switch` de `body` ET dans `supportedFamilies` de `StepWidget`.
+/// `.widgetURL` est défini dans chaque vue enfant pour que le tap ouvre l'app principale.
 struct StepWidgetView: View {
 
-    /// Données fournies par `StepWidgetProvider` pour cet instant de la timeline.
     let entry: StepEntry
 
-    // ═══════════════════════════════════════════════════════════════
-    // ÉTAPE 1 — Détecter automatiquement la taille du widget
-    // ═══════════════════════════════════════════════════════════════
-    // @Environment(\.widgetFamily) est injecté automatiquement par WidgetKit.
-    // Il indique la taille du widget choisie par l'utilisateur :
-    //   - .systemSmall  → widget carré (petite taille)
-    //   - .systemMedium → widget rectangulaire (taille moyenne)
-    //   - .systemLarge  → widget tall (non supporté ici)
-    // Cette valeur est lue à l'affichage, on ne peut pas la modifier.
-
-    /// Taille du widget détectée automatiquement par WidgetKit.
-    ///
-    /// `.systemSmall` = carré · `.systemMedium` = rectangulaire.
-    /// Modifiée par le système uniquement — ne pas assigner manuellement.
     @Environment(\.widgetFamily) var widgetFamily
 
-    // ═══════════════════════════════════════════════════════════════
-    // ÉTAPE 2 — Router vers la bonne vue selon la taille du widget
-    // ═══════════════════════════════════════════════════════════════
-    // Le switch sur widgetFamily choisit quelle vue afficher.
-    // C'est le seul rôle de StepWidgetView : servir de "routeur".
-    // Chaque vue (SmallWidgetView, MediumWidgetView) s'occupe de
-    // son propre design indépendamment.
-    // Le cas "default" couvre les tailles non prévues (sécurité).
-
-    /// La vue SwiftUI rendue par ce composant.
-    ///
-    /// Sélectionne la mise en page appropriée selon la taille du widget.
     var body: some View {
         switch widgetFamily {
         case .systemSmall:
@@ -63,118 +35,131 @@ struct StepWidgetView: View {
 
 // MARK: - Widget Carré (Small)
 
-// ═══════════════════════════════════════════════════════════════
-// ÉTAPE 3 — SmallWidgetView : layout carré en colonne verticale
-// ═══════════════════════════════════════════════════════════════
-// Le widget small est un carré compact. On empile les éléments
-// verticalement (VStack) de haut en bas :
-//   1. Icône de marche (SF Symbol)
-//   2. Nombre de pas (gros chiffre)
-//   3. Label "pas"
-//   4. Barre de progression horizontale
-//   5. Texte de l'objectif (petit)
-//
-// L'espace est limité, donc on garde uniquement l'essentiel.
-
 /// Layout compact pour le widget carré (`.systemSmall`).
 ///
-/// Affiche du haut vers le bas : icône de marche, nombre de pas,
-/// libellé "pas", barre de progression, objectif en petit texte.
-/// Le fond dégradé est défini dans `StepWidget.containerBackground`.
+/// Affiche un contenu différent selon l'état du widget :
+/// - `.loaded`       → icône + pas + barre de progression + objectif
+/// - `.unavailable`  → message "HealthKit non disponible"
+/// - `.unauthorized` → message "Ouvre l'app pour autoriser"
+///
+/// `.widgetURL` permet d'ouvrir l'app en tapant sur le widget.
 struct SmallWidgetView: View {
 
-    /// Données fournies par le provider pour cet instant de la timeline.
     let entry: StepEntry
 
-    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
+        Group {
+            switch entry.state {
+            case .loaded:
+                loadedContent
+            case .unavailable:
+                stateContent(
+                    icon: "heart.slash.fill",
+                    message: "HealthKit\nnon disponible"
+                )
+            case .unauthorized:
+                stateContent(
+                    icon: "lock.shield.fill",
+                    message: "Ouvre l'app\npour autoriser"
+                )
+            }
+        }
+        .padding(12)
+        // Taper sur le widget ouvre l'app principale
+        .widgetURL(URL(string: "steptracker://open"))
+    }
+
+    // MARK: - Contenu chargé
+
+    /// Vue affichée quand les données HealthKit sont disponibles.
+    private var loadedContent: some View {
         VStack(spacing: 8) {
-            // ═══════════════════════════════════════════════════════════════
-            // ÉTAPE 4 — SF Symbol : icône native iOS sans asset custom
-            // ═══════════════════════════════════════════════════════════════
-            // Image(systemName:) utilise les SF Symbols d'Apple : une
-            // bibliothèque de +6000 icônes vectorielles intégrées à iOS.
-            // Avantages : pas de fichier image à gérer, s'adaptent aux
-            // tailles de police, disponibles dans toutes les épaisseurs.
-            // "figure.walk" = icône d'une personne qui marche.
             Image(systemName: "figure.walk")
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.white)
 
-            // Nombre de pas — le chiffre principal, bien visible
-            // ═══════════════════════════════════════════════════════════════
-            // ÉTAPE 5 — minimumScaleFactor : réduire la taille si nécessaire
-            // ═══════════════════════════════════════════════════════════════
-            // Si le nombre de pas est très grand (ex: "12 345"), il pourrait
-            // ne pas rentrer dans le widget. .minimumScaleFactor(0.6) autorise
-            // iOS à réduire la taille de la police jusqu'à 60% de l'original.
-            // .lineLimit(1) force le texte à tenir sur une seule ligne.
             Text("\(entry.stepCount)")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-                .minimumScaleFactor(0.6)  // Réduit la taille si le nombre est très grand
+                .minimumScaleFactor(0.6)
                 .lineLimit(1)
 
-            // Label "pas" sous le nombre
             Text("pas")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.8))
 
-            // ═══════════════════════════════════════════════════════════════
-            // ÉTAPE 6 — ProgressBarView : barre de progression réutilisable
-            // ═══════════════════════════════════════════════════════════════
-            // ProgressBarView est un composant séparé (défini plus bas)
-            // qu'on réutilise dans les deux tailles de widget.
-            // entry.progress = ratio entre 0.0 et 1.0 (calculé dans StepEntry).
-            // .frame(height: 6) fixe la hauteur de la barre à 6 points.
-            // .padding(.horizontal, 8) laisse un espace de 8 points sur les côtés.
             ProgressBarView(progress: entry.progress)
                 .frame(height: 6)
                 .padding(.horizontal, 8)
 
-            // Objectif en petit texte
-            Text("Objectif : \(entry.stepGoal)")
+            Text("/ \(entry.stepGoal) pas")
                 .font(.system(size: 9, weight: .regular))
                 .foregroundColor(.white.opacity(0.7))
         }
-        .padding(12)
+    }
+
+    // MARK: - Contenu d'état (erreur)
+
+    /// Vue affichée en cas d'indisponibilité ou d'accès non accordé.
+    ///
+    /// - Parameters:
+    ///   - icon: SF Symbol à afficher.
+    ///   - message: Texte explicatif en deux lignes.
+    private func stateContent(icon: String, message: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+
+            Text(message)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 // MARK: - Widget Rectangulaire (Medium)
 
-// ═══════════════════════════════════════════════════════════════
-// ÉTAPE 7 — MediumWidgetView : layout rectangulaire en deux colonnes
-// ═══════════════════════════════════════════════════════════════
-// Le widget medium est deux fois plus large que le small.
-// On utilise un HStack pour diviser l'espace en deux colonnes :
-//   Colonne gauche : icône dans cercle + grand nombre de pas
-//   Colonne droite : pourcentage + barre + objectif + pas restants
-//
-// .frame(maxWidth: .infinity) sur chaque colonne les force à partager
-// l'espace disponible en deux moitiés égales.
-
 /// Layout élargi pour le widget rectangulaire (`.systemMedium`).
 ///
 /// Divise l'espace en deux colonnes :
 /// - **Gauche** : icône dans un cercle translucide + nombre de pas
-/// - **Droite** : pourcentage, barre de progression, objectif, pas restants
+/// - **Droite**  : pourcentage, barre de progression, objectif, pas restants
+///
+/// En cas d'erreur, affiche un message centré sur toute la largeur.
 struct MediumWidgetView: View {
 
-    /// Données fournies par le provider pour cet instant de la timeline.
     let entry: StepEntry
 
-    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
+        Group {
+            switch entry.state {
+            case .loaded:
+                loadedContent
+            case .unavailable:
+                stateContent(
+                    icon: "heart.slash.fill",
+                    message: "HealthKit non disponible sur cet appareil"
+                )
+            case .unauthorized:
+                stateContent(
+                    icon: "lock.shield.fill",
+                    message: "Ouvre l'app StepTracker pour autoriser l'accès à Santé"
+                )
+            }
+        }
+        .padding(16)
+        .widgetURL(URL(string: "steptracker://open"))
+    }
+
+    // MARK: - Contenu chargé (deux colonnes)
+
+    private var loadedContent: some View {
         HStack(spacing: 16) {
 
-            // ════════════════════════════════════════════════════════════
-            // ÉTAPE 8 — Colonne gauche : icône dans cercle + nombre de pas
-            // ════════════════════════════════════════════════════════════
-            // ZStack superpose un cercle blanc translucide et l'icône par-dessus.
-            // C'est une technique courante pour créer un "badge" d'icône.
-            // Circle().fill(.white.opacity(0.2)) = fond circulaire semi-transparent.
-            // L'icône figure.walk est centrée automatiquement par ZStack.
+            // Colonne gauche : icône + nombre de pas
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
@@ -198,18 +183,7 @@ struct MediumWidgetView: View {
             }
             .frame(maxWidth: .infinity)
 
-            // ════════════════════════════════════════════════════════════
-            // ÉTAPE 9 — Colonne droite : détails de progression
-            // ════════════════════════════════════════════════════════════
-            // Cette colonne affiche 4 informations empilées verticalement :
-            //   1. Pourcentage atteint (ex: "65%") avec icône cible
-            //   2. Barre de progression horizontale (ProgressBarView)
-            //   3. Objectif total avec icône drapeau
-            //   4. Pas restants OU "Objectif atteint !" si 0 restants
-            //
-            // Pour les pas restants : max(0, ...) évite les valeurs négatives
-            // si les pas dépassent l'objectif. L'opérateur ternaire "? :"
-            // choisit le texte et l'icône selon si remaining == 0 ou non.
+            // Colonne droite : progression détaillée
             VStack(alignment: .leading, spacing: 10) {
 
                 HStack {
@@ -217,7 +191,7 @@ struct MediumWidgetView: View {
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.9))
 
-                    Text("\(Int(entry.progress * 100))%")
+                    Text("\(Int(min(entry.progress, 9.99) * 100))%")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                 }
@@ -248,96 +222,96 @@ struct MediumWidgetView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(16)
+    }
+
+    // MARK: - Contenu d'état (erreur)
+
+    private func stateContent(icon: String, message: String) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 32, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 // MARK: - Barre de progression réutilisable
 
-// ═══════════════════════════════════════════════════════════════
-// ÉTAPE 10 — ProgressBarView : barre de progression avec GeometryReader
-// ═══════════════════════════════════════════════════════════════
-// Une barre de progression horizontale se compose de deux rectangles :
-//   1. Le fond (semi-transparent, largeur 100%)
-//   2. Le remplissage (blanc, largeur = progress × largeur totale)
-//
-// GeometryReader est nécessaire pour connaître la largeur disponible
-// en points (geometry.size.width) et calculer la largeur du remplissage.
-// ZStack(alignment: .leading) superpose les deux rectangles avec le
-// remplissage aligné à gauche.
-//
-// min(progress, 1.0) plafonne visuellement la barre à 100% même si
-// l'utilisateur a fait 120% de son objectif.
-
-/// Barre de progression horizontale personnalisée avec coins arrondis.
+/// Barre de progression horizontale avec coins arrondis.
 ///
-/// Le remplissage est proportionnel à `progress` (plafonné à 100% visuellement
-/// grâce à `min(progress, 1.0)`), sur un fond semi-transparent blanc.
-/// Utilisée à la fois dans `SmallWidgetView` et `MediumWidgetView`.
+/// Le remplissage est proportionnel à `progress`, plafonné visuellement à 100 %
+/// (`min(progress, 1.0)`). Le fond est semi-transparent, le remplissage est blanc.
 struct ProgressBarView: View {
 
     /// Ratio de remplissage entre 0.0 (vide) et 1.0+ (plein).
-    ///
-    /// Les valeurs supérieures à 1.0 sont acceptées mais clampées visuellement
-    /// à la largeur totale de la barre (l'arc ne déborde pas).
     let progress: Double
 
-    /// La vue SwiftUI rendue par ce composant.
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                // Fond de la barre (semi-transparent)
                 RoundedRectangle(cornerRadius: 4)
                     .fill(.white.opacity(0.3))
 
-                // Remplissage (plafonné à 100% pour ne pas déborder)
                 RoundedRectangle(cornerRadius: 4)
                     .fill(.white)
-                    .frame(
-                        width: geometry.size.width * min(progress, 1.0)
-                    )
+                    .frame(width: geometry.size.width * min(progress, 1.0))
             }
         }
     }
 }
 
-// MARK: - Preview pour Xcode
+// MARK: - Previews Xcode
 
-/// Ces previews permettent de voir le widget directement dans Xcode
-/// sans avoir besoin de le compiler et le lancer sur un vrai iPhone.
-
-#Preview("Small - Rouge (5%)", as: .systemSmall) {
+#Preview("Small – Rouge (5%)", as: .systemSmall) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 500, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 500, stepGoal: 10_000, state: .loaded)
 }
 
-#Preview("Small - Orange (35%)", as: .systemSmall) {
+#Preview("Small – Orange (35%)", as: .systemSmall) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 3500, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 3_500, stepGoal: 10_000, state: .loaded)
 }
 
-#Preview("Small - Jaune (65%)", as: .systemSmall) {
+#Preview("Small – Jaune (65%)", as: .systemSmall) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 6500, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 6_500, stepGoal: 10_000, state: .loaded)
 }
 
-#Preview("Small - Vert (95%)", as: .systemSmall) {
+#Preview("Small – Vert (95%)", as: .systemSmall) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 9500, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 9_500, stepGoal: 10_000, state: .loaded)
 }
 
-#Preview("Medium - Orange", as: .systemMedium) {
+#Preview("Small – Non autorisé", as: .systemSmall) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 4200, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 0, stepGoal: 10_000, state: .unauthorized)
 }
 
-#Preview("Medium - Objectif atteint", as: .systemMedium) {
+#Preview("Medium – Orange", as: .systemMedium) {
     StepWidget()
 } timeline: {
-    StepEntry(date: Date(), stepCount: 11_500, stepGoal: 10_000)
+    StepEntry(date: Date(), stepCount: 4_200, stepGoal: 10_000, state: .loaded)
+}
+
+#Preview("Medium – Objectif atteint", as: .systemMedium) {
+    StepWidget()
+} timeline: {
+    StepEntry(date: Date(), stepCount: 11_500, stepGoal: 10_000, state: .loaded)
+}
+
+#Preview("Medium – Non autorisé", as: .systemMedium) {
+    StepWidget()
+} timeline: {
+    StepEntry(date: Date(), stepCount: 0, stepGoal: 10_000, state: .unauthorized)
 }

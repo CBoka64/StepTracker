@@ -1,53 +1,78 @@
 // StepTrackerApp.swift
 // StepTracker
 //
-// Point d'entrée de l'application. Le modificateur @main indique à Swift
-// que c'est ici que l'exécution commence. Cette structure crée une fenêtre
-// et y injecte ContentView comme vue racine.
+// Point d'entrée de l'application et routage au lancement.
+// AppRootView lit la page par défaut choisie par l'utilisateur
+// et navigue directement vers elle si elle est définie.
 
 import SwiftUI
 
-// MARK: - Point d'entrée de l'app
+// MARK: - Pages de navigation
 
-/// Point d'entrée de l'application StepTracker.
+/// Identifie les 4 sections navigables de l'application.
 ///
-/// Annotée `@main`, cette structure est instanciée automatiquement par le
-/// runtime Swift/SwiftUI au lancement de l'app. Elle déclare une `WindowGroup`
-/// qui encapsule `ContentView` et gère nativement le multifenêtrage
-/// sur iPad et Mac.
+/// Conforme à `Hashable` pour être utilisé avec `NavigationStack`.
+/// La valeur `rawValue` (String) est persistée dans `@AppStorage`
+/// pour mémoriser la page d'accueil choisie par l'utilisateur.
+enum AppPage: String, Hashable {
+    case permissions
+    case steps
+    case sleep
+    case dashboard
+}
 
-// ═══════════════════════════════════════════════════════════════
-// ÉTAPE 1 — Swift repère @main et démarre l'application ici
-// ═══════════════════════════════════════════════════════════════
-// L'annotation @main dit au compilateur Swift :
-// "C'est cette structure qui est le point de départ de l'application."
-// Sans elle, l'app ne saurait pas par où commencer. Une seule structure
-// peut porter @main dans tout le projet.
+// MARK: - Point d'entrée
+
 @main
 struct StepTrackerApp: App {
-
-    // ═══════════════════════════════════════════════════════════════
-    // ÉTAPE 2 — On déclare le type de l'application via le protocole App
-    // ═══════════════════════════════════════════════════════════════
-    // Le protocole App oblige à définir une propriété "body" de type Scene.
-    // C'est SwiftUI qui appelle automatiquement ce body au démarrage
-    // pour construire l'interface de l'app.
-
-    /// La scène racine de l'application : une `WindowGroup` contenant `ContentView`.
-    ///
-    /// `WindowGroup` crée autant de fenêtres que le système le permet
-    /// (plusieurs fenêtres sur iPad ou macOS, une seule sur iPhone).
     var body: some Scene {
-
-        // ═══════════════════════════════════════════════════════════════
-        // ÉTAPE 3 — WindowGroup crée la fenêtre et affiche ContentView
-        // ═══════════════════════════════════════════════════════════════
-        // WindowGroup est le conteneur de fenêtre standard SwiftUI.
-        // Sur iPhone : une seule fenêtre est créée.
-        // Sur iPad/Mac : plusieurs fenêtres peuvent exister en même temps.
-        // ContentView est la première vue que l'utilisateur voit à l'écran.
         WindowGroup {
-            ContentView()
+            AppRootView()
+        }
+    }
+}
+
+// MARK: - Routage au lancement
+
+/// Vue racine : gère le menu principal et la navigation vers chaque section.
+///
+/// Au premier lancement, si une page par défaut a été enregistrée
+/// (via le bouton ⌂ dans chaque section), l'app navigue directement
+/// vers cette section sans passer par le menu.
+struct AppRootView: View {
+
+    /// Page d'accueil persistée. Vide = afficher le menu.
+    @AppStorage("defaultPage") private var defaultPage: String = ""
+
+    /// Pile de navigation SwiftUI.
+    @State private var path: [AppPage] = []
+
+    /// Garde-fou pour n'appliquer la page par défaut qu'une seule fois par session.
+    @State private var launched = false
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            HomeMenuView()
+                .navigationDestination(for: AppPage.self) { page in
+                    switch page {
+                    case .permissions:
+                        HealthKitPermissionsView()
+                    case .steps:
+                        StepTrackingView()
+                    case .sleep:
+                        SleepTrackingView()
+                    case .dashboard:
+                        DashboardView()
+                    }
+                }
+        }
+        .onAppear {
+            guard !launched else { return }
+            launched = true
+            // Naviguer directement vers la page par défaut si elle est définie
+            if let page = AppPage(rawValue: defaultPage) {
+                path = [page]
+            }
         }
     }
 }

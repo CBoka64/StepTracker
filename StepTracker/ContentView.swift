@@ -21,7 +21,7 @@ import WidgetKit
 /// La mise en page s'adapte automatiquement :
 /// - **compact** (iPhone) → `compactLayout` (défilement vertical)
 /// - **regular** (iPad/Mac) → `regularLayout` (deux colonnes côte à côte)
-struct ContentView: View {
+struct StepTrackingView: View {
 
     // ═══════════════════════════════════════════════════════════════
     // ÉTAPE 1 — Déclarer les variables d'état (@State) de la vue
@@ -70,6 +70,11 @@ struct ContentView: View {
 
     /// Référence au singleton `HealthKitManager` pour l'autorisation et la lecture des pas.
     private let healthManager = HealthKitManager.shared
+
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("defaultPage") private var defaultPage: String = ""
+
+    private var isDefault: Bool { defaultPage == AppPage.steps.rawValue }
 
     // ═══════════════════════════════════════════════════════════════
     // ÉTAPE 3 — Calculer le ratio de progression (pas / objectif)
@@ -141,6 +146,7 @@ struct ContentView: View {
             )
         }
         .task { await setupHealthKit() }
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     // MARK: - Layout compact (iPhone)
@@ -201,12 +207,33 @@ struct ContentView: View {
 
     // MARK: - Composants
 
-    /// Titre "Mes Pas" aligné à gauche en haut de l'écran.
+    /// En-tête avec bouton retour (←), titre centré et bouton page par défaut (⌂).
     private var headerTitle: some View {
-        Text("Mes Pas")
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundColor(.white.opacity(0.85))
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack {
+            // Retour au menu
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.85))
+            }
+
+            Spacer()
+
+            Text("Mes Pas")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white.opacity(0.85))
+
+            Spacer()
+
+            // Définir / retirer comme page par défaut
+            Button {
+                defaultPage = isDefault ? "" : AppPage.steps.rawValue
+            } label: {
+                Image(systemName: isDefault ? "house.fill" : "house")
+                    .font(.system(size: 17))
+                    .foregroundColor(.white.opacity(0.85))
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -579,5 +606,5 @@ struct GoalButton: View {
 // MARK: - Preview
 
 #Preview("Jaune – 65%") {
-    ContentView()
+    StepTrackingView()
 }
