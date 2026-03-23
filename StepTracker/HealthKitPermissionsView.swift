@@ -7,6 +7,7 @@
 
 import SwiftUI
 import HealthKit
+import UIKit
 
 // MARK: - Vue des permissions
 
@@ -126,6 +127,22 @@ struct HealthKitPermissionsView: View {
                     }
                     .padding(.horizontal, 20)
                     .disabled(isLoading || isAuthorized)
+
+                    // Bouton vers les réglages iOS pour gérer/révoquer l'accès
+                    Button {
+                        if let url = URL(string: "x-apple-health://") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "gear")
+                                .font(.system(size: 14))
+                            Text("Gérer dans Réglages Santé")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.white.opacity(0.75))
+                        .padding(.top, 6)
+                    }
 
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
