@@ -68,6 +68,9 @@ class HealthKitManager {
     /// — cette valeur ne peut pas être `nil`.
     private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
 
+    /// Type de donnée lu pour le sommeil.
+    private let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+
     // MARK: - Vérifier la disponibilité de HealthKit
 
     // ═══════════════════════════════════════════════════════════════
@@ -117,8 +120,8 @@ class HealthKitManager {
         }
 
         try await healthStore.requestAuthorization(
-            toShare: [],          // On n'écrit rien dans Santé
-            read: [stepType]      // On lit uniquement les pas
+            toShare: [],
+            read: [stepType, sleepType]
         )
     }
 
@@ -194,6 +197,49 @@ class HealthKitManager {
         return Int(sum.doubleValue(for: .count()))
     }
 
+    // MARK: - Récupérer le sommeil de la nuit dernière
+
+    /// Récupère la durée totale de sommeil de la nuit précédente.
+    func fetchLastNightSleep() async throws -> TimeInterval {
+        guard isAvailable else {
+            throw HealthKitError.notAvailable
+        }
+
+        let calendar = Calendar.current
+        let now = Date()
+
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let windowStart = calendar.date(byAdding: .hour, value: -6, to: startOfToday),
+              let windowEnd   = calendar.date(byAdding: .hour, value: 12, to: startOfToday)
+        else { return 0 }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: windowStart,
+            end: windowEnd,
+            options: .strictStartDate
+        )
+
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.categorySample(type: sleepType, predicate: predicate)],
+            sortDescriptors: []
+        )
+
+        let samples = try await descriptor.result(for: healthStore)
+
+        let sleepSeconds = samples
+            .compactMap { $0 as? HKCategorySample }
+            .filter { sample in
+                let value = HKCategoryValueSleepAnalysis(rawValue: sample.value)
+                return value == .asleepUnspecified
+                    || value == .asleepCore
+                    || value == .asleepDeep
+                    || value == .asleepREM
+            }
+            .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+
+        return sleepSeconds
+    }
+
     // MARK: - Gestion de l'objectif de pas
 
     // ═══════════════════════════════════════════════════════════════
@@ -244,6 +290,19 @@ class HealthKitManager {
         }
         set {
             sharedDefaults?.set(newValue, forKey: "stepGoal")
+        }
+    }
+
+    /// Objectif de sommeil en minutes, lu et écrit dans l'App Group partagé.
+    ///
+    /// - Valeur par défaut : **480 minutes** (8 heures).
+    var sleepGoalMinutes: Int {
+        get {
+            let goal = sharedDefaults?.integer(forKey: "sleepGoalMinutes") ?? 0
+            return goal > 0 ? goal : 480  // 8h par défaut
+        }
+        set {
+            sharedDefaults?.set(newValue, forKey: "sleepGoalMinutes")
         }
     }
 }

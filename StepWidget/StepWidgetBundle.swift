@@ -56,5 +56,6 @@ struct StepWidgetBundle: WidgetBundle {
     /// dans la galerie de widgets d'iOS.
     var body: some Widget {
         StepWidget()
+        SleepWidget()
     }
 }

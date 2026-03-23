@@ -81,6 +81,7 @@ struct StepWidget: Widget {
             // (requis depuis iOS 17). On utilise un LinearGradient dynamique
             // dont les couleurs changent avec la progression (rouge → vert).
             StepWidgetView(entry: entry)
+                .widgetURL(URL(string: "steptracker://steps"))
                 .containerBackground(for: .widget) {
                     LinearGradient(
                         colors: entry.gradientColors,

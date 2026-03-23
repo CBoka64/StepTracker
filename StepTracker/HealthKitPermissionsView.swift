@@ -60,7 +60,7 @@ struct HealthKitPermissionsView: View {
                         .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
 
-                    Text("StepTracker lit uniquement vos données de pas depuis l'app Santé. Aucune donnée n'est écrite ni partagée.")
+                    Text("StepTracker lit vos données de pas et de sommeil depuis l'app Santé. Aucune donnée n'est écrite ni partagée.")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.75))
                         .multilineTextAlignment(.center)

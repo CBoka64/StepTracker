@@ -77,5 +77,11 @@ struct AppRootView: View {
                 path = [page]
             }
         }
+        .onOpenURL { url in
+            // Deep link depuis un widget : steptracker://steps  ou  steptracker://sleep
+            guard url.scheme == "steptracker",
+                  let page = AppPage(rawValue: url.host ?? "") else { return }
+            path = [page]
+        }
     }
 }
