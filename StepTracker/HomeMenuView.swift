@@ -9,18 +9,13 @@ import SwiftUI
 
 // MARK: - Menu principal
 
-/// Vue d'accueil qui présente les 4 sections de l'application.
-///
-/// La page par défaut est indiquée par l'icône ⌂ sur la carte concernée.
-/// Modifier la page par défaut se fait depuis chaque section.
 struct HomeMenuView: View {
 
-    /// Page définie comme accueil par l'utilisateur (empty = ce menu).
     @AppStorage("defaultPage") private var defaultPage: String = ""
+    @Binding var path: [AppPage]
 
     var body: some View {
         ZStack {
-            // Fond dégradé bleu-indigo neutre pour le menu
             LinearGradient(
                 colors: [
                     Color(red: 0.15, green: 0.25, blue: 0.65),
@@ -29,7 +24,7 @@ struct HomeMenuView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .ignoresSafeArea()
+            .ignoresSafeArea(.all)
 
             ScrollView {
                 VStack(spacing: 0) {
@@ -53,7 +48,7 @@ struct HomeMenuView: View {
 
                     // Cartes de navigation
                     VStack(spacing: 14) {
-                        NavigationLink(value: AppPage.permissions) {
+                        Button { path.append(.permissions) } label: {
                             MenuItemCard(
                                 icon: "hand.raised.fill",
                                 title: "Permissions HealthKit",
@@ -63,7 +58,7 @@ struct HomeMenuView: View {
                         }
                         .buttonStyle(.plain)
 
-                        NavigationLink(value: AppPage.steps) {
+                        Button { path.append(.steps) } label: {
                             MenuItemCard(
                                 icon: "figure.walk",
                                 title: "Suivi des pas",
@@ -73,7 +68,7 @@ struct HomeMenuView: View {
                         }
                         .buttonStyle(.plain)
 
-                        NavigationLink(value: AppPage.sleep) {
+                        Button { path.append(.sleep) } label: {
                             MenuItemCard(
                                 icon: "moon.zzz.fill",
                                 title: "Suivi du sommeil",
@@ -83,7 +78,7 @@ struct HomeMenuView: View {
                         }
                         .buttonStyle(.plain)
 
-                        NavigationLink(value: AppPage.dashboard) {
+                        Button { path.append(.dashboard) } label: {
                             MenuItemCard(
                                 icon: "chart.bar.fill",
                                 title: "Dashboard",
@@ -95,7 +90,6 @@ struct HomeMenuView: View {
                     }
                     .padding(.horizontal, 20)
 
-                    // Indicateur de page par défaut active
                     if let page = AppPage(rawValue: defaultPage) {
                         Label("Accueil : \(page.displayName)", systemImage: "house.fill")
                             .font(.system(size: 12, weight: .regular))
@@ -106,28 +100,22 @@ struct HomeMenuView: View {
                 }
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .ignoresSafeArea(.all)
     }
 }
 
 // MARK: - Carte de menu
 
-/// Carte cliquable représentant une section de l'application.
-///
-/// L'icône ⌂ (`house.fill`) s'affiche quand cette section est définie
-/// comme page d'accueil par défaut.
 struct MenuItemCard: View {
 
     let icon: String
     let title: String
     let subtitle: String
-    /// `true` si cette section est la page d'accueil par défaut.
     let isDefault: Bool
 
     var body: some View {
         HStack(spacing: 16) {
 
-            // Icône dans badge
             Image(systemName: icon)
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(.white)
@@ -135,7 +123,6 @@ struct MenuItemCard: View {
                 .background(.white.opacity(0.2))
                 .cornerRadius(12)
 
-            // Titre + sous-titre
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(title)
@@ -171,7 +158,6 @@ struct MenuItemCard: View {
 // MARK: - Extension utilitaire
 
 extension AppPage {
-    /// Nom lisible de la section, affiché dans le menu.
     var displayName: String {
         switch self {
         case .permissions: return "Permissions"
@@ -185,5 +171,5 @@ extension AppPage {
 // MARK: - Preview
 
 #Preview {
-    HomeMenuView()
+    HomeMenuView(path: .constant([]))
 }

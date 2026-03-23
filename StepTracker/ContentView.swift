@@ -71,7 +71,7 @@ struct StepTrackingView: View {
     /// Référence au singleton `HealthKitManager` pour l'autorisation et la lecture des pas.
     private let healthManager = HealthKitManager.shared
 
-    @Environment(\.dismiss) private var dismiss
+    @Binding var path: [AppPage]
     @AppStorage("defaultPage") private var defaultPage: String = ""
 
     private var isDefault: Bool { defaultPage == AppPage.steps.rawValue }
@@ -146,7 +146,7 @@ struct StepTrackingView: View {
             )
         }
         .task { await setupHealthKit() }
-        .toolbar(.hidden, for: .navigationBar)
+        .ignoresSafeArea(.all)
     }
 
     // MARK: - Layout compact (iPhone)
@@ -211,7 +211,7 @@ struct StepTrackingView: View {
     private var headerTitle: some View {
         HStack {
             // Retour au menu
-            Button { dismiss() } label: {
+            Button { path.removeLast() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
@@ -606,5 +606,5 @@ struct GoalButton: View {
 // MARK: - Preview
 
 #Preview("Jaune – 65%") {
-    StepTrackingView()
+    StepTrackingView(path: .constant([.steps]))
 }

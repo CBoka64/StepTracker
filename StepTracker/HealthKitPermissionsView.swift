@@ -18,7 +18,7 @@ import UIKit
 /// En cas de refus, redirige vers les Réglages iOS.
 struct HealthKitPermissionsView: View {
 
-    @Environment(\.dismiss) private var dismiss
+    @Binding var path: [AppPage]
 
     /// `true` si HealthKit a retourné des données avec succès (proxy d'autorisation).
     @State private var isAuthorized = false
@@ -157,7 +157,7 @@ struct HealthKitPermissionsView: View {
                 Spacer()
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .ignoresSafeArea(.all)
         .task { await checkStatus() }
     }
 
@@ -166,7 +166,7 @@ struct HealthKitPermissionsView: View {
     /// En-tête commun avec bouton retour, sans icône d'accueil par défaut.
     private func sectionHeader(title: String) -> some View {
         HStack {
-            Button { dismiss() } label: {
+            Button { path.removeLast() } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
@@ -222,5 +222,5 @@ struct HealthKitPermissionsView: View {
 // MARK: - Preview
 
 #Preview {
-    HealthKitPermissionsView()
+    HealthKitPermissionsView(path: .constant([.permissions]))
 }

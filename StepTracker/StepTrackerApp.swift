@@ -28,6 +28,7 @@ struct StepTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             AppRootView()
+                .preferredColorScheme(.dark)
         }
     }
 }
@@ -51,25 +52,27 @@ struct AppRootView: View {
     @State private var launched = false
 
     var body: some View {
-        NavigationStack(path: $path) {
-            HomeMenuView()
-                .navigationDestination(for: AppPage.self) { page in
-                    switch page {
-                    case .permissions:
-                        HealthKitPermissionsView()
-                    case .steps:
-                        StepTrackingView()
-                    case .sleep:
-                        SleepTrackingView()
-                    case .dashboard:
-                        DashboardView()
-                    }
-                }
+        ZStack {
+            // Fond de secours qui couvre toute la fenêtre, y compris les zones hors safe area
+            Color(red: 0.08, green: 0.12, blue: 0.40)
+                .ignoresSafeArea(.all)
+
+            switch path.last {
+            case .permissions:
+                HealthKitPermissionsView(path: $path)
+            case .steps:
+                StepTrackingView(path: $path)
+            case .sleep:
+                SleepTrackingView(path: $path)
+            case .dashboard:
+                DashboardView(path: $path)
+            case .none:
+                HomeMenuView(path: $path)
+            }
         }
         .onAppear {
             guard !launched else { return }
             launched = true
-            // Naviguer directement vers la page par défaut si elle est définie
             if let page = AppPage(rawValue: defaultPage) {
                 path = [page]
             }
